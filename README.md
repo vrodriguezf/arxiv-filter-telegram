@@ -8,14 +8,60 @@ This is a Telegram bot that filters ArXiv newsletter items based on user-defined
 - List all added keywords.
 - Remove specific keywords.
 - Automatically filter newsletter by pasting it into the chat.
+- Uses a webhook for efficient updates from Telegram.
 
 ## Setup
 
-1. Clone this repository.
-2. Install the required packages:
-   ```bash
-   pip install -r requirements.txt
+### Prerequisites
+
+- Docker
+- Docker Compose
+
+### Environment Variables
+
+Create a `.env` file in the project root and add the following variables:
+
+```env
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+WEBHOOK_URL=https://yourdomain.com/webhook
 ```
-3. Create the Telegram Bot. You'll need to create a bot on Telegram and get the token. You can do this by talking to the BotFather on Telegram. Once you have the token.
-4. Create a `.env` file and add the variable `TELEGRAM_BOT_TOKEN`there with the token that you got.
-5. Run the bot with `python bot.py`.
+
+Replace `your-telegram-bot-token` with your actual Telegram bot token, and `https://yourdomain.com/webhook` with the actual URL where your bot will be hosted.
+
+### Running the Bot
+
+1. **Clone the repository**:
+   
+   ```bash
+   git clone https://github.com/yourusername/arxiv-telegram-bot.git
+   cd arxiv-telegram-bot
+   ```
+
+2. **Build and run the Docker container**:
+   
+   ```bash
+   docker-compose up --build
+   ```
+
+This will build the Docker image and start the bot using the specified webhook URL.
+
+### Usage
+
+- Start the bot by sending `/start` in the Telegram chat.
+- Add keywords using `/add <keyword>`.
+- List keywords using `/list`.
+- Remove keywords using `/remove <keyword>`.
+- Paste the ArXiv newsletter directly into the chat to filter it based on your keywords.
+
+### Deployment
+
+Ensure that your server's public URL matches the `WEBHOOK_URL` in the `.env` file. Telegram will send updates to this URL, so it must be accessible over the internet.
+
+### Notes
+
+- The bot uses Flask to handle incoming webhook requests from Telegram.
+- Docker is used to containerize the bot for easy deployment and scaling.
+
+### License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
