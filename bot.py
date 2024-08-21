@@ -2,20 +2,24 @@ import os
 import re
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from flask import Flask, request
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Get the token from the environment variable
+# Get the token and webhook URL from environment variables
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+app = Flask(__name__)
 
 # A dictionary to store keywords for each user
 user_keywords = {}
 
 # Function to start the bot and set a welcome message
 def start(update: Update, context: CallbackContext):
-    update.message.reply_text('Welcome! Use /add to add keywords, /list to list keywords, /remove to remove a keyword, and /filter to filter ArXiv newsletters.')
+    update.message.reply_text('Welcome! Use /add to add keywords, /list to list keywords, /remove to remove a keyword, and then just paste an ArXiv newsletter to filter it.')
 
 # Function to add keywords
 def add_keyword(update: Update, context: CallbackContext):
@@ -54,7 +58,7 @@ def remove_keyword(update: Update, context: CallbackContext):
 
 # Function to split the newsletter into individual papers
 def split_newsletter(newsletter: str):
-    papers = newsletter.split('------------------------------------------------------------------------------\n\\')
+    papers = newsletter.split('------------------------------------------------------------------------------\\n\\\\')
     return papers
 
 # Function to filter papers based on keywords
@@ -62,12 +66,12 @@ def filter_papers(papers, keywords):
     filtered_papers = []
     for paper in papers:
         for keyword in keywords:
-            if re.search(r'\b' + re.escape(keyword) + r'\b', paper, re.IGNORECASE):
+            if re.search(r'\\b' + re.escape(keyword) + r'\\b', paper, re.IGNORECASE):
                 filtered_papers.append(paper)
                 break
     return filtered_papers
 
-# Function to filter the newsletter
+# Function to automatically filter the newsletter based on pasted text
 def filter_newsletter(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     keywords = user_keywords.get(user_id, [])
@@ -76,7 +80,7 @@ def filter_newsletter(update: Update, context: CallbackContext):
         update.message.reply_text('You have no keywords. Use /add to add some.')
         return
     
-    newsletter = context.args[0]  # Assuming the entire newsletter text is passed as an argument
+    newsletter = update.message.text  # The entire newsletter text is the message content
     papers = split_newsletter(newsletter)
     filtered_papers = filter_papers(papers, keywords)
 
@@ -86,7 +90,7 @@ def filter_newsletter(update: Update, context: CallbackContext):
     else:
         update.message.reply_text('No papers found matching your keywords.')
 
-# Main function to handle bot commands
+# Main function to set up the webhook and Flask server
 def main():
     updater = Updater(TELEGRAM_BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
@@ -95,10 +99,20 @@ def main():
     dp.add_handler(CommandHandler("add", add_keyword))
     dp.add_handler(CommandHandler("list", list_keywords))
     dp.add_handler(CommandHandler("remove", remove_keyword))
-    dp.add_handler(CommandHandler("filter", filter_newsletter))
+    
+    # This handler processes any text message as a potential newsletter
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, filter_newsletter))
 
-    updater.start_polling()
-    updater.idle()
+    # Set the webhook
+    updater.bot.set_webhook(WEBHOOK_URL)
+
+    @app.route('/webhook', methods=['POST'])
+    def webhook():
+        update = Update.de_json(request.get_json(force=True), updater.bot)
+        updater.dispatcher.process_update(update)
+        return "ok", 200
+
+    app.run(host='0.0.0.0', port=5000)
 
 if __name__ == '__main__':
     main()
